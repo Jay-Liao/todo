@@ -9,35 +9,34 @@ import (
 
 type todo struct {
 	ID          int
-	DESCRIPTION string
+	Description string
 }
 
 func getTodos(context *gin.Context) {
+	var todos []todo
+	for _, todoItem := range todoMap {
+		todos = append(todos, todoItem)
+	}
 	context.JSON(http.StatusOK, todos)
 }
 
 func addTodo(context *gin.Context) {
 	var newTodo todo
 	context.BindJSON(&newTodo)
-	lastTodo := todos[len(todos)-1]
-	lastID := lastTodo.ID
-	newTodo.ID = lastID + 1
-	todos = append(todos, newTodo)
+	latestID := len(todoMap) + 1
+	newTodo.ID = latestID
+	newIDString := strconv.Itoa(latestID)
+	todoMap[newIDString] = newTodo
 	context.JSON(http.StatusOK, newTodo)
 }
 
 func getTodo(context *gin.Context) {
 	id := context.Param("id")
-	theTodo := todo{-1, "Not Found"}
-	for _, todo := range todos {
-		if strconv.Itoa(todo.ID) == id {
-			theTodo = todo
-		}
-	}
-	if theTodo.ID == -1 {
-		context.String(http.StatusNotFound, "Todo with id %s was not found", id)
-	} else {
+	theTodo, exist := todoMap[id]
+	if exist {
 		context.JSON(http.StatusOK, theTodo)
+	} else {
+		context.String(http.StatusNotFound, "Todo with id %s was not found", id)
 	}
 }
 
@@ -45,54 +44,41 @@ func updateTodo(context *gin.Context) {
 	var newTodo todo
 	context.BindJSON(&newTodo)
 	id := context.Param("id")
-	theTodo := todo{-1, "Not Found"}
-	target := -1
-	for index, todo := range todos {
-		if strconv.Itoa(todo.ID) == id {
-			target = index
-		}
-	}
-	if target >= 0 {
-		newTodo.ID = todos[target].ID
-		todos[target] = newTodo
-		theTodo = newTodo
-	}
-	if theTodo.ID == -1 {
-		context.String(http.StatusNotFound, "Todo with id %s was not found", id)
-	} else {
+	theTodo, exist := todoMap[id]
+	if exist {
+		theTodo.Description = newTodo.Description
+		todoMap[id] = theTodo
 		context.JSON(http.StatusOK, theTodo)
+	} else {
+		context.String(http.StatusNotFound, "Todo with id %s was not found", id)
 	}
 }
 
 func deleteTodo(context *gin.Context) {
 	id := context.Param("id")
-	target := -1
-	for index, todo := range todos {
-		if strconv.Itoa(todo.ID) == id {
-			target = index
-		}
-	}
-
-	if target >= 0 {
-		todos[target] = todos[len(todos)-1]
-		todos = todos[:len(todos)-1]
+	_, exist := todoMap[id]
+	if exist {
+		delete(todoMap, id)
 		context.String(http.StatusOK, "Todo with id %s has been deleted", id)
 	} else {
 		context.String(http.StatusNotFound, "Todo with id %s was not found", id)
 	}
 }
 
-var todos []todo
+var todoMap map[string]todo
 
 func main() {
-	todos = append(todos, todo{1, "Learning golang"})
-	todos = append(todos, todo{2, "Learning node js"})
+	todoMap = map[string]todo{
+		"1": todo{1, "Learning golang"},
+		"2": todo{2, "Learning node js"},
+	}
 
 	router := gin.Default()
 
+	// /api/todos
 	router.GET("/api/todos", getTodos)
 	router.POST("/api/todos", addTodo)
-
+	// /api/todos/:id
 	router.GET("/api/todos/:id", getTodo)
 	router.PATCH("/api/todos/:id", updateTodo)
 	router.DELETE("api/todos/:id", deleteTodo)
